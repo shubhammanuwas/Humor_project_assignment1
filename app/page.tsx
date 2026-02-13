@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 type ShareRow = {
   profile_id: string | null
@@ -6,6 +6,7 @@ type ShareRow = {
 }
 
 async function getShares(): Promise<ShareRow[]> {
+  const supabase = createSupabaseServerClient()
   const { data, error } = await supabase
     .from('shares')
     .select('profile_id, share_to_destination_id')
