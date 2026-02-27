@@ -1,12 +1,15 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import SignOutButton from './sign-out-button'
 import { revalidatePath } from 'next/cache'
+import CaptionPipeline from './caption-pipeline'
 
 type CaptionRow = {
   [key: string]: string | number | boolean | null
 }
 
 type VoteDirection = 'up' | 'down'
+
+type SupabaseClient = ReturnType<typeof createSupabaseServerClient>
 
 function getCaptionId(row: CaptionRow): string {
   const rawId = row.id ?? row.caption_id
@@ -34,6 +37,90 @@ function getCaptionText(row: CaptionRow): string {
   return JSON.stringify(row)
 }
 
+async function resolveProfileId(
+  supabase: SupabaseClient,
+  authUserId: string
+): Promise<string> {
+  const byUserId = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', authUserId)
+    .limit(1)
+    .maybeSingle()
+
+  if (!byUserId.error && byUserId.data?.id) {
+    return String(byUserId.data.id)
+  }
+
+  const byAuthUserId = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('auth_user_id', authUserId)
+    .limit(1)
+    .maybeSingle()
+
+  if (!byAuthUserId.error && byAuthUserId.data?.id) {
+    return String(byAuthUserId.data.id)
+  }
+
+  return authUserId
+}
+
+async function insertVote(
+  supabase: SupabaseClient,
+  captionId: string,
+  profileId: string,
+  direction: VoteDirection
+): Promise<{ success: boolean; errorMessage?: string }> {
+  const now = new Date().toISOString()
+  const payloads: Array<Record<string, string | number>> = [
+    {
+      caption_id: captionId,
+      profile_id: profileId,
+      vote_value: direction === 'up' ? 1 : -1,
+      created_datetime_utc: now,
+      modified_datetime_utc: now,
+    },
+    {
+      caption_id: captionId,
+      profile_id: profileId,
+      vote_value: direction === 'up' ? 1 : -1,
+    },
+    {
+      caption_id: captionId,
+      profile_id: profileId,
+      vote_value: direction === 'up' ? 'up' : 'down',
+      created_datetime_utc: now,
+      modified_datetime_utc: now,
+    },
+    {
+      caption_id: captionId,
+      profile_id: profileId,
+      vote_value: direction === 'up' ? 'up' : 'down',
+    },
+  ]
+
+  for (const payload of payloads) {
+    const { error } = await supabase.from('caption_votes').insert(payload)
+    if (!error) {
+      return { success: true }
+    }
+  }
+
+  const { error } = await supabase.from('caption_votes').insert({
+    caption_id: captionId,
+    profile_id: profileId,
+    vote_value: direction === 'up' ? 1 : -1,
+    created_datetime_utc: now,
+    modified_datetime_utc: now,
+  })
+
+  return {
+    success: false,
+    errorMessage: error?.message ?? 'Unknown insert error',
+  }
+}
+
 async function voteCaption(formData: FormData) {
   'use server'
 
@@ -53,19 +140,10 @@ async function voteCaption(formData: FormData) {
     return
   }
 
-  const now = new Date().toISOString()
-  const voteValue = direction === 'up' ? 1 : -1
-
-  const { error: insertError } = await supabase.from('caption_votes').insert({
-    caption_id: captionId,
-    profile_id: user.id,
-    vote_value: voteValue,
-    created_datetime_utc: now,
-    modified_datetime_utc: now,
-  })
-
-  if (insertError) {
-    console.error('Vote insert error:', insertError.message)
+  const profileId = await resolveProfileId(supabase, user.id)
+  const result = await insertVote(supabase, captionId, profileId, direction)
+  if (!result.success) {
+    console.error('Vote insert error:', result.errorMessage)
     return
   }
 
@@ -109,6 +187,7 @@ export default async function ProtectedPage() {
         Rate captions below. Each vote creates a new row in caption_votes.
       </p>
       <SignOutButton />
+      <CaptionPipeline />
 
       <section style={{ marginTop: '2rem', maxWidth: '760px' }}>
         <h2 style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>Captions</h2>

@@ -1,0 +1,226 @@
+'use client'
+
+import { FormEvent, useMemo, useState } from 'react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
+
+const API_BASE_URL = 'https://api.almostcrackd.ai'
+
+const SUPPORTED_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+])
+
+type CaptionRecord = Record<string, unknown>
+
+async function parseJsonResponse(response: Response): Promise<unknown> {
+  const text = await response.text()
+  if (!text) {
+    return null
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+function pickCaptionText(record: CaptionRecord): string {
+  const candidates = ['caption', 'text', 'content', 'body', 'caption_text']
+
+  for (const key of candidates) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value
+    }
+  }
+
+  return JSON.stringify(record)
+}
+
+export default function CaptionPipeline() {
+  const [file, setFile] = useState<File | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [captions, setCaptions] = useState<CaptionRecord[]>([])
+  const [lastImageId, setLastImageId] = useState<string | null>(null)
+
+  const fileTypeValid = useMemo(() => {
+    if (!file) {
+      return true
+    }
+    return SUPPORTED_TYPES.has(file.type.toLowerCase())
+  }, [file])
+
+  const runPipeline = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setErrorMessage(null)
+    setCaptions([])
+    setLastImageId(null)
+
+    if (!file) {
+      setErrorMessage('Select an image first.')
+      return
+    }
+
+    if (!fileTypeValid) {
+      setErrorMessage(`Unsupported file type: ${file.type}`)
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const supabase = createSupabaseBrowserClient()
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession()
+
+      if (sessionError || !session?.access_token) {
+        throw new Error('No valid auth token found. Sign in again.')
+      }
+
+      const token = session.access_token
+
+      const step1Response = await fetch(`${API_BASE_URL}/pipeline/generate-presigned-url`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contentType: file.type }),
+      })
+
+      const step1Data = (await parseJsonResponse(step1Response)) as {
+        presignedUrl?: string
+        cdnUrl?: string
+      } | null
+
+      if (!step1Response.ok || !step1Data?.presignedUrl || !step1Data.cdnUrl) {
+        throw new Error(`Step 1 failed: ${step1Response.status}`)
+      }
+
+      const step2Response = await fetch(step1Data.presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      })
+
+      if (!step2Response.ok) {
+        throw new Error(`Step 2 failed: ${step2Response.status}`)
+      }
+
+      const step3Response = await fetch(`${API_BASE_URL}/pipeline/upload-image-from-url`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: step1Data.cdnUrl,
+          isCommonUse: false,
+        }),
+      })
+
+      const step3Data = (await parseJsonResponse(step3Response)) as {
+        imageId?: string
+      } | null
+
+      if (!step3Response.ok || !step3Data?.imageId) {
+        throw new Error(`Step 3 failed: ${step3Response.status}`)
+      }
+
+      setLastImageId(step3Data.imageId)
+
+      const step4Response = await fetch(`${API_BASE_URL}/pipeline/generate-captions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageId: step3Data.imageId }),
+      })
+
+      const step4Data = await parseJsonResponse(step4Response)
+
+      if (!step4Response.ok) {
+        throw new Error(`Step 4 failed: ${step4Response.status}`)
+      }
+
+      const list = Array.isArray(step4Data)
+        ? (step4Data as CaptionRecord[])
+        : ((step4Data as { captions?: CaptionRecord[] } | null)?.captions ?? [])
+
+      setCaptions(list)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setErrorMessage(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <section style={{ marginTop: '2rem', maxWidth: '760px' }}>
+      <h2 style={{ fontSize: '1.35rem', marginBottom: '0.8rem' }}>Generate Captions</h2>
+      <form onSubmit={runPipeline} style={{ display: 'grid', gap: '0.7rem' }}>
+        <input
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
+          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+        />
+        <button
+          type="submit"
+          disabled={isLoading || !file || !fileTypeValid}
+          style={{
+            width: 'fit-content',
+            padding: '0.55rem 0.9rem',
+            border: '1px solid #ddd',
+            borderRadius: '6px',
+            background: '#fff',
+            cursor: isLoading || !file || !fileTypeValid ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isLoading ? 'Processing...' : 'Upload And Generate Captions'}
+        </button>
+      </form>
+
+      {!fileTypeValid ? (
+        <p style={{ color: '#a00', marginTop: '0.8rem' }}>
+          File type not supported. Use jpeg, jpg, png, webp, gif, or heic.
+        </p>
+      ) : null}
+
+      {errorMessage ? (
+        <p style={{ color: '#a00', marginTop: '0.8rem' }}>Error: {errorMessage}</p>
+      ) : null}
+
+      {lastImageId ? (
+        <p style={{ marginTop: '0.8rem' }}>Image ID: {lastImageId}</p>
+      ) : null}
+
+      {captions.length > 0 ? (
+        <ul style={{ listStyle: 'none', padding: 0, marginTop: '1rem' }}>
+          {captions.map((record, index) => (
+            <li
+              key={`generated-caption-${index}`}
+              style={{
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                marginBottom: '0.65rem',
+              }}
+            >
+              {pickCaptionText(record)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  )
+}
