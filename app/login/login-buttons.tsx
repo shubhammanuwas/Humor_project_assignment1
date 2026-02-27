@@ -28,14 +28,7 @@ export default function LoginButtons() {
       type="button"
       onClick={handleGoogleSignIn}
       disabled={isLoading}
-      style={{
-        padding: '0.75rem 1.25rem',
-        borderRadius: '8px',
-        border: '1px solid #ddd',
-        background: isLoading ? '#f2f2f2' : '#fff',
-        cursor: isLoading ? 'not-allowed' : 'pointer',
-        fontSize: '1rem',
-      }}
+      className="btn btn-primary"
     >
       {isLoading ? 'Redirecting...' : 'Continue with Google'}
     </button>

@@ -166,56 +166,44 @@ export default function CaptionPipeline() {
   }
 
   return (
-    <section style={{ marginTop: '2rem', maxWidth: '760px' }}>
-      <h2 style={{ fontSize: '1.35rem', marginBottom: '0.8rem' }}>Generate Captions</h2>
-      <form onSubmit={runPipeline} style={{ display: 'grid', gap: '0.7rem' }}>
+    <section className="panel stack-sm">
+      <h2 className="section-title">Generate Captions</h2>
+      <form onSubmit={runPipeline} className="stack-sm">
         <input
           type="file"
           accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
+          className="file-input"
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
         />
         <button
           type="submit"
           disabled={isLoading || !file || !fileTypeValid}
-          style={{
-            width: 'fit-content',
-            padding: '0.55rem 0.9rem',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            background: '#fff',
-            cursor: isLoading || !file || !fileTypeValid ? 'not-allowed' : 'pointer',
-          }}
+          className="btn btn-primary"
         >
           {isLoading ? 'Processing...' : 'Upload And Generate Captions'}
         </button>
       </form>
 
       {!fileTypeValid ? (
-        <p style={{ color: '#a00', marginTop: '0.8rem' }}>
+        <p className="status-error">
           File type not supported. Use jpeg, jpg, png, webp, gif, or heic.
         </p>
       ) : null}
 
       {errorMessage ? (
-        <p style={{ color: '#a00', marginTop: '0.8rem' }}>Error: {errorMessage}</p>
+        <p className="status-error">Error: {errorMessage}</p>
       ) : null}
 
       {lastImageId ? (
-        <p style={{ marginTop: '0.8rem' }}>Image ID: {lastImageId}</p>
+        <p className="status-success">
+          Image ID: <span className="mono">{lastImageId}</span>
+        </p>
       ) : null}
 
       {captions.length > 0 ? (
-        <ul style={{ listStyle: 'none', padding: 0, marginTop: '1rem' }}>
+        <ul className="list-reset stack-sm">
           {captions.map((record, index) => (
-            <li
-              key={`generated-caption-${index}`}
-              style={{
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '0.65rem',
-              }}
-            >
+            <li key={`generated-caption-${index}`} className="card">
               {pickCaptionText(record)}
             </li>
           ))}

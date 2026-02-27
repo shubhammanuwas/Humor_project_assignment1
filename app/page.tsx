@@ -23,63 +23,38 @@ export default async function Home() {
   const shares = await getShares()
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        padding: '3rem 1.5rem',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      <h1 style={{ fontSize: '2rem', marginBottom: '1.5rem' }}>
-        Supabase Shares
-      </h1>
+    <main className="page-shell">
+      <div className="page-grid">
+        <section className="panel">
+          <h1 className="title">Supabase Shares</h1>
+          <p className="subtitle">Assignment #2 data read from the shares table.</p>
+        </section>
 
-      {shares.length === 0 ? (
-        <p>No rows found.</p>
-      ) : (
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            maxWidth: '720px',
-          }}
-        >
-          <thead>
-            <tr>
-              <th
-                style={{
-                  textAlign: 'left',
-                  borderBottom: '1px solid #ddd',
-                  padding: '0.5rem 0',
-                }}
-              >
-                profile_id
-              </th>
-              <th
-                style={{
-                  textAlign: 'left',
-                  borderBottom: '1px solid #ddd',
-                  padding: '0.5rem 0',
-                }}
-              >
-                share_to_destination_id
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {shares.map((row, idx) => (
-              <tr key={`${row.profile_id ?? 'null'}-${idx}`}>
-                <td style={{ padding: '0.5rem 0' }}>
-                  {row.profile_id ?? 'null'}
-                </td>
-                <td style={{ padding: '0.5rem 0' }}>
-                  {row.share_to_destination_id ?? 'null'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        <section className="panel">
+          {shares.length === 0 ? (
+            <p>No rows found.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>profile_id</th>
+                    <th>share_to_destination_id</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shares.map((row, idx) => (
+                    <tr key={`${row.profile_id ?? 'null'}-${idx}`}>
+                      <td>{row.profile_id ?? 'null'}</td>
+                      <td>{row.share_to_destination_id ?? 'null'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   )
 }

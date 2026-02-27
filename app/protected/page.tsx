@@ -170,94 +170,65 @@ export default async function ProtectedPage() {
   const captions = await getCaptions()
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        padding: '3rem 1.5rem',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-        Protected Page
-      </h1>
-      <p style={{ marginBottom: '1rem' }}>
-        You are signed in as {user?.email ?? 'Unknown user'}.
-      </p>
-      <p style={{ marginBottom: '1.25rem' }}>
-        Rate captions below. Each vote creates a new row in caption_votes.
-      </p>
-      <SignOutButton />
-      <CaptionPipeline />
+    <main className="page-shell">
+      <div className="page-grid">
+        <section className="panel stack-sm">
+          <h1 className="title">Protected Workspace</h1>
+          <p className="subtitle">
+            Signed in as <span className="mono">{user?.email ?? 'Unknown user'}</span>
+          </p>
+          <p className="subtitle">
+            Rate captions below. Each vote creates a row in `caption_votes`.
+          </p>
+          <div className="action-row">
+            <SignOutButton />
+          </div>
+        </section>
 
-      <section style={{ marginTop: '2rem', maxWidth: '760px' }}>
-        <h2 style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>Captions</h2>
-        {captions.length === 0 ? (
-          <p>No captions found (or access is blocked by RLS).</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {captions.map((caption, idx) => {
-              const captionId = getCaptionId(caption)
-              const captionText = getCaptionText(caption)
-              const disabled = captionId.length === 0
+        <CaptionPipeline />
 
-              return (
-                <li
-                  key={`${captionId || 'missing-id'}-${idx}`}
-                  style={{
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    padding: '0.9rem',
-                    marginBottom: '0.75rem',
-                  }}
-                >
-                  <p style={{ margin: 0, marginBottom: '0.65rem' }}>{captionText}</p>
-                  <div style={{ display: 'flex', gap: '0.6rem' }}>
-                    <form action={voteCaption}>
-                      <input type="hidden" name="caption_id" value={captionId} />
-                      <input type="hidden" name="direction" value="up" />
-                      <button
-                        type="submit"
-                        disabled={disabled}
-                        style={{
-                          padding: '0.45rem 0.8rem',
-                          border: '1px solid #ddd',
-                          borderRadius: '6px',
-                          background: '#fff',
-                          cursor: disabled ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        Upvote
-                      </button>
-                    </form>
-                    <form action={voteCaption}>
-                      <input type="hidden" name="caption_id" value={captionId} />
-                      <input type="hidden" name="direction" value="down" />
-                      <button
-                        type="submit"
-                        disabled={disabled}
-                        style={{
-                          padding: '0.45rem 0.8rem',
-                          border: '1px solid #ddd',
-                          borderRadius: '6px',
-                          background: '#fff',
-                          cursor: disabled ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        Downvote
-                      </button>
-                    </form>
-                  </div>
-                  {disabled ? (
-                    <p style={{ margin: '0.55rem 0 0 0', color: '#a00', fontSize: '0.9rem' }}>
-                      Missing caption id column (expected id or caption_id).
-                    </p>
-                  ) : null}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
+        <section className="panel">
+          <h2 className="section-title">Captions</h2>
+          {captions.length === 0 ? (
+            <p>No captions found (or access is blocked by RLS).</p>
+          ) : (
+            <ul className="list-reset stack-sm">
+              {captions.map((caption, idx) => {
+                const captionId = getCaptionId(caption)
+                const captionText = getCaptionText(caption)
+                const disabled = captionId.length === 0
+
+                return (
+                  <li key={`${captionId || 'missing-id'}-${idx}`} className="card stack-sm">
+                    <p>{captionText}</p>
+                    <div className="action-row">
+                      <form action={voteCaption}>
+                        <input type="hidden" name="caption_id" value={captionId} />
+                        <input type="hidden" name="direction" value="up" />
+                        <button type="submit" disabled={disabled} className="btn btn-ghost">
+                          Upvote
+                        </button>
+                      </form>
+                      <form action={voteCaption}>
+                        <input type="hidden" name="caption_id" value={captionId} />
+                        <input type="hidden" name="direction" value="down" />
+                        <button type="submit" disabled={disabled} className="btn btn-ghost">
+                          Downvote
+                        </button>
+                      </form>
+                    </div>
+                    {disabled ? (
+                      <p className="status-error">
+                        Missing caption id column (expected id or caption_id).
+                      </p>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+      </div>
     </main>
   )
 }
